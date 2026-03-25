@@ -1,0 +1,9 @@
+# The virtual environment created by uv
+.venv/
+
+# (Optional) If you use uv's persistent cache in-project
+.uv/
+
+# (Optional) Python build artifacts
+__pycache__/
+*.pyc
