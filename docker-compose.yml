@@ -1,0 +1,6 @@
+services:
+  pipeline:
+    build: .
+    env_file: .env
+    volumes:
+      - ./pittsburgh.db:/app/pittsburgh.db  # persist DB on host
