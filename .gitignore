@@ -1,4 +1,7 @@
-# Secrets
+# (Optional) If you use uv's persistent cache in-project
+.uv/
+*.pyc
+# Secrets — never commit these
 .env
 gcs-key.json
 
@@ -17,3 +20,4 @@ dist/
 
 # Docker
 *.log
+.python-version
