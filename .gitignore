@@ -1,0 +1,23 @@
+# (Optional) If you use uv's persistent cache in-project
+.uv/
+*.pyc
+# Secrets — never commit these
+.env
+gcs-key.json
+
+# Database
+pittsburgh.db
+
+# Map output
+pittsburgh_map.html
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# Docker
+*.log
+.python-version
