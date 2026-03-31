@@ -1,6 +1,17 @@
 services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
   pipeline:
     build: .
     env_file: .env
     volumes:
       - .:/app
+    depends_on:
+      - ollama
+volumes:
+  ollama_models:
