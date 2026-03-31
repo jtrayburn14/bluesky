@@ -1,17 +1,12 @@
 services:
-  ollama:
-    image: ollama/ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-    restart: unless-stopped
   pipeline:
     build: .
-    env_file: .env
     volumes:
       - .:/app
-    depends_on:
-      - ollama
-volumes:
-  ollama_models:
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Pointing to Ollama on your host machine
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    # Keeps the container alive so you can "exec" into it
+    tty: true 
+    stdin_open: true

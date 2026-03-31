@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pittsburgh Public Safety Dashboard</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: white; }
+        
+        #header { 
+            background: #2c3e50; padding: 15px 20px; 
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid #34495e;
+        }
+
+        #controls {
+            background: #ffffff; color: #333; padding: 12px 20px;
+            display: flex; gap: 25px; align-items: center; font-size: 0.9em;
+        }
+
+        #map { height: calc(100vh - 120px); width: 100%; background: #242424; }
+
+        /* Custom Tooltip Styling */
+        .leaflet-tooltip {
+            background: #333 !important;
+            color: #fff !important;
+            border: 1px solid #555 !important;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 13px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .severity-badge { 
+            display: inline-block; padding: 2px 8px; border-radius: 3px; 
+            color: white; font-weight: bold; font-size: 0.85em; margin-top: 8px;
+        }
+
+        select, input { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div><strong style="font-size: 1.3em;">PGH Scanner Live</strong></div>
+        <div id="stats-text" style="opacity: 0.8;">Loading...</div>
+    </div>
+
+    <div id="controls">
+        <label><strong>Minimum Severity:</strong> 
+            <select id="severityFilter" onchange="updateMap()">
+                <option value="0">0 (All)</option>
+                <option value="2">2 (Minor)</option>
+                <option value="3">3 (Elevated)</option>
+                <option value="4">4 (High)</option>
+                <option value="5">5 (Critical)</option>
+            </select>
+        </label>
+        
+        <label><strong>History:</strong> 
+            <select id="dateFilter" onchange="updateMap()">
+                <option value="1">Last 24 Hours</option>
+                <option value="3">Last 3 Days</option>
+                <option value="7" selected>Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="999">All Time</option>
+            </select>
+        </label>
+
+        <label><strong>Theme:</strong> 
+            <select id="themeFilter" onchange="updateTheme()">
+                <option value="dark">Dark Mode</option>
+                <option value="light">Light Mode</option>
+            </select>
+        </label>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script src="data.js"></script>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([40.4406, -79.9959], 12);
+        let geojsonLayer;
+        let tileLayer;
+
+        // --- THEME LOGIC ---
+        function updateTheme() {
+            if (tileLayer) map.removeLayer(tileLayer);
+            
+            const theme = document.getElementById('themeFilter').value;
+            const url = theme === 'dark' 
+                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+            tileLayer = L.tileLayer(url, {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+        }
+
+        // --- COLOR LOGIC ---
+        function getSeverityColor(s) {
+            const colors = ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#d63031'];
+            return colors[s - 1] || '#ADD8E6';
+        }
+
+        // --- MAP UPDATE LOGIC ---
+        function updateMap() {
+            const minSev = parseInt(document.getElementById('severityFilter').value);
+            const maxDays = parseInt(document.getElementById('dateFilter').value);
+            
+            // Calculate Date Cutoff
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - maxDays);
+
+            if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+            if (typeof incidentData !== 'undefined') {
+                geojsonLayer = L.geoJSON(incidentData, {
+                    filter: function(feature) {
+                        const isSevere = feature.properties.severity >= minSev;
+                        // Handle date check (assuming last_updated is ISO format from SQLite)
+                        const incidentDate = new Date(feature.properties.updated);
+                        const isRecent = incidentDate >= cutoff;
+                        return isSevere && isRecent;
+                    },
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 9,
+                            fillColor: getSeverityColor(feature.properties.severity),
+                            color: "#fff",
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        const p = feature.properties;
+                        const color = getSeverityColor(p.severity);
+
+                        // 1. HOVER TOOLTIP
+                        layer.bindTooltip(`<strong>${p.title}</strong>`, {
+                            sticky: true,
+                            direction: 'top',
+                            offset: [0, -10]
+                        });
+
+                        // 2. CLICK POPUP
+                        layer.bindPopup(`
+                            <div style="min-width: 220px; color: #333;">
+                                <strong style="font-size: 1.1em;">${p.title}</strong><br>
+                                <span class="severity-badge" style="background: ${color};">Severity ${p.severity}/5</span>
+                                <hr style="margin: 10px 0; border: 0; border-top: 1px solid #ddd;">
+                                <p style="margin: 0; line-height: 1.5;">${p.summary}</p>
+                                <div style="margin-top: 12px; font-size: 0.8em; color: #777; border-top: 1px dashed #eee; padding-top: 5px;">
+                                    Reported: ${new Date(p.updated).toLocaleString()}
+                                </div>
+                            </div>
+                        `);
+
+                        // 3. HOVER GLOW
+                        layer.on('mouseover', function() { this.setStyle({ weight: 4, color: '#000' }); });
+                        layer.on('mouseout', function() { this.setStyle({ weight: 1.5, color: '#fff' }); });
+                    }
+                }).addTo(map);
+
+                // Update Stats Header
+                const count = geojsonLayer.getLayers().length;
+                document.getElementById('stats-text').innerText = `Displaying ${count} incidents`;
+            }
+        }
+
+        // Initialize Everything
+        updateTheme();
+        updateMap();
+    </script>
+</body>
+</html>

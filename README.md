@@ -1,45 +1,38 @@
 # bluesky
 
-DE project 
+To run yourself:
+- make sure you have a Bluesky account
+- create a .env file in the root dir
+- add a BSKY_HANDLE with you handle
+- create a app_password within bluesky (setting -> security & privacy ...)
+- add your app_password to the .env as BSKY_PASSWORD
 
-data:
-```
-POSTS (Raw Data)
-├── id             (Primary Key)
-├── uri            (Unique ATProto URI)
-├── author         (DID or Handle)
-├── text           (Original content)
-├── created_at     (Timestamp)
-├── root_uri       (FK to parent - for threads)
-├── parent_uri     (FK to immediate parent)
-├── quote_uri      (URI of quoted post)
-└── llm_processed  (Boolean)
+data structure can be found in src/schema.py
 
-PROCESSED_POSTS
-├── id             (Primary Key)
-├── post_id        (FK → POSTS.id)
-├── severity       (INTEGER 1-5)
-├── location_raw   (TEXT - as extracted by LLM)
-├── location_found (BOOLEAN - true if extraction succeeded)
-└── processed_at   (Timestamp)
-
-COORDINATES (Cache for Geocoding)
-├── place_name     (PK - e.g., "Liberty Ave & 11th St")
-├── lat            (FLOAT)
-├── lng            (FLOAT)
-└── display_name   (TEXT - full address from provider)
+Running the api ingestion only:
 ```
-Running the api ingestion:
+docker compose run pipeline python src/bluesky_ingest.py
 ```
-docker compose run --rm pipeline python bluesky_ingest.py
+Running the sentiment analysis only:
 ```
-Running the sentiment analysis:
-```
-docker compose run --rm pipeline python ollama_process.py
+docker compose run pipeline python src/ollama_process.py
 ```
 
 QA:
+- make any query changes to the file peek.py
+- then run:
+    ```
+    docker compose run pipeline python src/peek.py
+    ```
+- or if you just want to query everything run:
 ```
-docker compose run --rm pipeline bash
-sqlite3 pittsburgh.db
-```
+
+
+Initialize & Ingest (Bronze):
+docker compose run pipeline python src/bluesky_ingest.py
+
+Transform (Silver):
+docker compose run pipeline python src/transformation.py
+
+Analyze (Silver Enrichment):
+docker compose run pipeline python src/ollama_process.py
